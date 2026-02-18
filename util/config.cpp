@@ -3,7 +3,7 @@
 
 #include "util/config.h"
 #include <iostream>
-
+#include <vector>
 using namespace std;
 
 static ostream *debug_os = &cerr;
