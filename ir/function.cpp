@@ -575,8 +575,8 @@ static auto getPhiPredecessors(const Function &F) {
   return map;
 }
 
-void Function::unroll(unsigned k) {
-  if (k == 0)
+void Function::unroll(vector<unsigned> unroll_bounds) {
+  if (unroll_bounds.size() == 0)
     return;
 
   LoopAnalysis la(*this);
@@ -658,13 +658,18 @@ void Function::unroll(unsigned k) {
     for (unsigned i = 0; i < height; ++i) {
       name_prefix += "#1";
     }
-    for (unsigned unroll = 2; unroll <= k; ++unroll) {
+    for (unsigned unroll = 2; unroll <= unroll_bounds.front(); ++unroll) {
       string suffix = name_prefix + '#' + to_string(unroll);
       for (auto *bb : loop_bbs) {
         auto &copies = bbmap.at(bb);
         copies.emplace_back(&cloneBB(*this, *bb, suffix.c_str(), bbmap, vmap));
         unrolled_bbs.emplace_back(copies.back());
       }
+    }
+    // use local unroll bounds
+    if (unroll_bounds.size()>1)
+    {
+      unroll_bounds.erase(unroll_bounds.begin());
     }
 
     // Clone the header once more so that the last iteration of the loop can
