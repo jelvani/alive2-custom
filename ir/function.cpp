@@ -9,6 +9,7 @@
 #include "util/unionfind.h"
 #include <algorithm>
 #include <fstream>
+#include <iostream>
 #include <set>
 #include <unordered_set>
 
@@ -22,7 +23,7 @@ void BasicBlock::setInstrs(std::vector<std::unique_ptr<Instr>> &&instrs) {
   m_instrs = std::move(instrs);
 }
 
-std::unique_ptr<Instr>& BasicBlock::getInstr(size_t index) {
+std::unique_ptr<Instr> &BasicBlock::getInstr(size_t index) {
   return m_instrs.at(index);
 }
 
@@ -73,14 +74,14 @@ void BasicBlock::popInstr() {
   m_instrs.pop_back();
 }
 
-void BasicBlock::addExitBlock(BasicBlock* bb) {
-    exit_blocks.emplace(bb);
+void BasicBlock::addExitBlock(BasicBlock *bb) {
+  exit_blocks.emplace(bb);
 }
 
-vector<Phi*> BasicBlock::phis() const {
-  vector<Phi*> phis;
+vector<Phi *> BasicBlock::phis() const {
+  vector<Phi *> phis;
   for (auto &i : m_instrs) {
-    if (auto phi = dynamic_cast<Phi*>(i.get()))
+    if (auto phi = dynamic_cast<Phi *>(i.get()))
       phis.emplace_back(phi);
   }
   return phis;
@@ -89,20 +90,20 @@ vector<Phi*> BasicBlock::phis() const {
 JumpInstr::it_helper BasicBlock::targets() const {
   if (empty())
     return {};
-  if (auto jump = dynamic_cast<JumpInstr*>(m_instrs.back().get()))
+  if (auto jump = dynamic_cast<JumpInstr *>(m_instrs.back().get()))
     return jump->targets();
   return {};
 }
 
 void BasicBlock::replaceTargetWith(const BasicBlock *from,
                                    const BasicBlock *to) {
-  if (auto jump = dynamic_cast<JumpInstr*>(&this->back())) {
+  if (auto jump = dynamic_cast<JumpInstr *>(&this->back())) {
     jump->replaceTargetWith(from, to);
   }
 }
 
-unique_ptr<BasicBlock>
-BasicBlock::dup(Function &f, const string &suffix) const {
+unique_ptr<BasicBlock> BasicBlock::dup(Function &f,
+                                       const string &suffix) const {
   auto newbb = make_unique<BasicBlock>(name + suffix);
   for (auto &i : instrs()) {
     newbb->addInstr(i.dup(f, suffix));
@@ -116,7 +117,7 @@ void BasicBlock::rauw(const Value &what, Value &with) {
   }
 }
 
-ostream& operator<<(ostream &os, const BasicBlock &bb) {
+ostream &operator<<(ostream &os, const BasicBlock &bb) {
   if (!bb.name.empty())
     os << string_view(bb.name).substr(1) << ":\n";
   for (auto &i : bb.instrs()) {
@@ -127,16 +128,15 @@ ostream& operator<<(ostream &os, const BasicBlock &bb) {
   return os;
 }
 
-
 BasicBlock Function::sink_bb("#sink");
 
 unsigned Function::FnDecl::hash() const {
   GenHash hash;
 
-  function<void(const Type&)> hash_ty = [&](const Type &ty) {
+  function<void(const Type &)> hash_ty = [&](const Type &ty) {
     if (ty.isPtrType()) {
       hash.add((uint8_t)0x42);
-    } else if (dynamic_cast<const VoidType*>(&ty)) {
+    } else if (dynamic_cast<const VoidType *>(&ty)) {
       hash.add((uint8_t)0xEF);
     } else if (auto agg = ty.getAsAggregateType()) {
       hash.add((uint8_t)0x11);
@@ -145,7 +145,7 @@ unsigned Function::FnDecl::hash() const {
           hash_ty(agg->getChild(i));
       }
     } else {
-      uint8_t data[2] = { uint8_t(0x33+ty.isFloatType()), (uint8_t)ty.bits() };
+      uint8_t data[2] = {uint8_t(0x33 + ty.isFloatType()), (uint8_t)ty.bits()};
       hash.add(data, sizeof(data));
     }
   };
@@ -163,7 +163,7 @@ expr Function::getTypeConstraints() const {
   for (auto bb : getBBs()) {
     t &= bb->getTypeConstraints(*this);
   }
-  for (auto &l : { getConstants(), getInputs(), getUndefs() }) {
+  for (auto &l : {getConstants(), getInputs(), getUndefs()}) {
     for (auto &v : l) {
       t &= v.getTypeConstraints();
     }
@@ -180,14 +180,14 @@ void Function::fixupTypes(const Model &m) {
   for (auto bb : getBBs()) {
     bb->fixupTypes(m);
   }
-  for (auto &l : { getConstants(), getInputs(), getUndefs() }) {
+  for (auto &l : {getConstants(), getInputs(), getUndefs()}) {
     for (auto &v : l) {
-      const_cast<Value&>(v).fixupTypes(m);
+      const_cast<Value &>(v).fixupTypes(m);
     }
   }
 }
 
-BasicBlock& Function::getEntryBB() {
+BasicBlock &Function::getEntryBB() {
   if (BB_order[0]->getName() == "#init") {
     return *BB_order[1];
   } else {
@@ -195,7 +195,7 @@ BasicBlock& Function::getEntryBB() {
   }
 }
 
-BasicBlock& Function::getBB(string_view name, bool push_front) {
+BasicBlock &Function::getBB(string_view name, bool push_front) {
   assert(name != "#sink");
   auto p = BBs.try_emplace(string(name), name);
   if (p.second) {
@@ -207,12 +207,12 @@ BasicBlock& Function::getBB(string_view name, bool push_front) {
   return p.first->second;
 }
 
-const BasicBlock& Function::getBB(string_view name) const {
+const BasicBlock &Function::getBB(string_view name) const {
   assert(name != "#sink");
   return BBs.at(string(name));
 }
 
-const BasicBlock& Function::bbOf(const Instr &i) const {
+const BasicBlock &Function::bbOf(const Instr &i) const {
   for (auto *bb : getBBs()) {
     for (auto &ii : bb->instrs())
       if (&ii == &i)
@@ -221,7 +221,7 @@ const BasicBlock& Function::bbOf(const Instr &i) const {
   UNREACHABLE();
 }
 
-BasicBlock& Function::insertBBAfter(string_view name, const BasicBlock &bb) {
+BasicBlock &Function::insertBBAfter(string_view name, const BasicBlock &bb) {
   auto p = BBs.try_emplace(string(name), name);
   if (p.second) {
     auto I = find(BB_order.begin(), BB_order.end(), &bb);
@@ -247,7 +247,7 @@ void Function::addConstant(unique_ptr<Value> &&c) {
   constants.emplace_back(std::move(c));
 }
 
-Value* Function::getGlobalVar(string_view name) const {
+Value *Function::getGlobalVar(string_view name) const {
   for (auto &c : constants) {
     if (c->getName() == name)
       return c.get();
@@ -258,7 +258,7 @@ Value* Function::getGlobalVar(string_view name) const {
 vector<GlobalVariable *> Function::getGlobalVars() const {
   vector<GlobalVariable *> gvs;
   for (auto I = constants.begin(), E = constants.end(); I != E; ++I) {
-    if (auto *gv = dynamic_cast<GlobalVariable*>(I->get()))
+    if (auto *gv = dynamic_cast<GlobalVariable *>(I->get()))
       gvs.push_back(gv);
   }
   return gvs;
@@ -266,9 +266,9 @@ vector<GlobalVariable *> Function::getGlobalVars() const {
 
 vector<string_view> Function::getGlobalVarNames() const {
   vector<string_view> gvnames;
-  ranges::transform(
-    getGlobalVars(), back_inserter(gvnames),
-    [](auto &itm) { return string_view(itm->getName()).substr(1); });
+  ranges::transform(getGlobalVars(), back_inserter(gvnames), [](auto &itm) {
+    return string_view(itm->getName()).substr(1);
+  });
   return gvnames;
 }
 
@@ -286,7 +286,7 @@ void Function::addAggregate(unique_ptr<AggregateValue> &&a) {
 
 void Function::addInput(unique_ptr<Value> &&i) {
   assert(dynamic_cast<Input *>(i.get()) ||
-         dynamic_cast<ConstantInput*>(i.get()));
+         dynamic_cast<ConstantInput *>(i.get()));
   inputs.emplace_back(std::move(i));
 }
 
@@ -307,8 +307,8 @@ void Function::syncDataWithSrc(Function &src) {
   auto IT = inputs.begin(), ET = inputs.end();
 
   for (; IS != ES && IT != ET; ++IS, ++IT) {
-    if (auto in_tgt = dynamic_cast<Input*>(IT->get()))
-      in_tgt->copySMTName(*dynamic_cast<Input*>(IS->get()));
+    if (auto in_tgt = dynamic_cast<Input *>(IT->get()))
+      in_tgt->copySMTName(*dynamic_cast<Input *>(IS->get()));
 
     if (!(IS->get()->getType() == IT->get()->getType()).isTrue())
       throw AliveException("Source and target args have different type", false);
@@ -321,7 +321,7 @@ void Function::syncDataWithSrc(Function &src) {
   // copy function decls that are called indirectly
   auto copy_fns = [](const auto &src, auto &dst) {
     for (auto &c : src.getConstants()) {
-      auto *gv = dynamic_cast<const GlobalVariable*>(&c);
+      auto *gv = dynamic_cast<const GlobalVariable *>(&c);
       if (gv && gv->isArbitrarySize() && !dst.getGlobalVar(gv->getName()))
         dst.addConstant(make_unique<GlobalVariable>(*gv));
     }
@@ -334,10 +334,10 @@ void Function::syncDataWithSrc(Function &src) {
   }
 }
 
-Function::instr_iterator::
-instr_iterator(vector<BasicBlock*>::const_iterator &&BBI,
-               vector<BasicBlock*>::const_iterator &&BBE)
-  : BBI(std::move(BBI)), BBE(std::move(BBE)) {
+Function::instr_iterator::instr_iterator(
+    vector<BasicBlock *>::const_iterator &&BBI,
+    vector<BasicBlock *>::const_iterator &&BBE)
+    : BBI(std::move(BBI)), BBE(std::move(BBE)) {
   next_bb();
 }
 
@@ -359,7 +359,7 @@ void Function::instr_iterator::operator++(void) {
 
 static void add_users(Function::UsersTy &users, Value *i, BasicBlock *bb,
                       Value *val) {
-  if (auto *agg = dynamic_cast<AggregateValue*>(val)) {
+  if (auto *agg = dynamic_cast<AggregateValue *>(val)) {
     for (auto elem : agg->getVals()) {
       add_users(users, val, bb, elem);
     }
@@ -370,7 +370,7 @@ static void add_users(Function::UsersTy &users, Value *i, BasicBlock *bb,
 
 void Function::addFnDecl(FnDecl &&decl) {
   if (find_if(fn_decls.begin(), fn_decls.end(),
-      [&](auto &d) { return d.name == decl.name; }) != fn_decls.end())
+              [&](auto &d) { return d.name == decl.name; }) != fn_decls.end())
     return;
   fn_decls.emplace_back(std::move(decl));
 }
@@ -380,7 +380,7 @@ Function::UsersTy Function::getUsers() const {
   for (auto *bb : getBBs()) {
     for (auto &i : bb->instrs()) {
       for (auto op : i.operands()) {
-        add_users(users, const_cast<Instr*>(&i), bb, op);
+        add_users(users, const_cast<Instr *>(&i), bb, op);
       }
     }
   }
@@ -388,7 +388,7 @@ Function::UsersTy Function::getUsers() const {
     add_users(users, agg.get(), nullptr, agg.get());
   }
   for (auto &c : constants) {
-    if (auto agg = dynamic_cast<AggregateValue*>(c.get())) {
+    if (auto agg = dynamic_cast<AggregateValue *>(c.get())) {
       add_users(users, agg, nullptr, agg);
     }
   }
@@ -399,14 +399,14 @@ template <typename T>
 static bool removeUnused(T &data, const Function::UsersTy &users,
                          const vector<string_view> &src_glbs) {
   bool changed = false;
-  for (auto I = data.begin(); I != data.end(); ) {
+  for (auto I = data.begin(); I != data.end();) {
     if (users.count(I->get())) {
       ++I;
       continue;
     }
 
     // don't delete glbs in target that are used in src
-    if (auto gv = dynamic_cast<GlobalVariable*>(I->get())) {
+    if (auto gv = dynamic_cast<GlobalVariable *>(I->get())) {
       auto name = string_view(gv->getName()).substr(1);
       if (find(src_glbs.begin(), src_glbs.end(), name) != src_glbs.end()) {
         ++I;
@@ -427,9 +427,9 @@ bool Function::removeUnusedStuff(const UsersTy &users,
   return changed;
 }
 
-static vector<BasicBlock*> top_sort(const vector<BasicBlock*> &bbs) {
+static vector<BasicBlock *> top_sort(const vector<BasicBlock *> &bbs) {
   edgesTy edges(bbs.size());
-  unordered_map<const BasicBlock*, unsigned> bb_map;
+  unordered_map<const BasicBlock *, unsigned> bb_map;
 
   unsigned i = 0;
   for (auto bb : bbs) {
@@ -448,7 +448,7 @@ static vector<BasicBlock*> top_sort(const vector<BasicBlock*> &bbs) {
     // in order to account for some transitive dependencies we may have
     // missed due to compression of its inner loops.
     // If there are no inner loops, this is redundant and if `bb` is not
-    // a loop header, the set of its exit blocks is empty. 
+    // a loop header, the set of its exit blocks is empty.
     for (auto &dst : bb->getExitBlocks()) {
       auto dst_I = bb_map.find(dst);
       if (dst_I != bb_map.end())
@@ -457,7 +457,7 @@ static vector<BasicBlock*> top_sort(const vector<BasicBlock*> &bbs) {
     ++i;
   }
 
-  vector<BasicBlock*> sorted_bbs;
+  vector<BasicBlock *> sorted_bbs;
   sorted_bbs.reserve(bbs.size());
   for (auto v : util::top_sort(edges)) {
     sorted_bbs.emplace_back(bbs[v]);
@@ -472,10 +472,10 @@ void Function::topSort() {
 }
 
 static void
-rauw_op(const unordered_map<const Value*,
-                            vector<pair<BasicBlock*, Value*>>> &vmap,
-        const unordered_set<const Value *> &phis_from_orig_bb,
-        Value *i, Value *op) {
+rauw_op(const unordered_map<const Value *, vector<pair<BasicBlock *, Value *>>>
+            &vmap,
+        const unordered_set<const Value *> &phis_from_orig_bb, Value *i,
+        Value *op) {
   auto it = vmap.find(op);
   if (it != vmap.end()) {
     // consider this case:
@@ -485,11 +485,11 @@ rauw_op(const unordered_map<const Value*,
     //
     // In iteration i, %k should point to iteration (i-1)'s %k.
     // If is_phi_to_phi is true, %op is the phi in this block.
-    bool is_phi_to_phi = dynamic_cast<const Phi *>(i) &&
-                         phis_from_orig_bb.count(op);
+    bool is_phi_to_phi =
+        dynamic_cast<const Phi *>(i) && phis_from_orig_bb.count(op);
     if (is_phi_to_phi) {
       if (it->second.size() >= 2) {
-        i->rauw(*op, *it->second[it->second.size()-2].second);
+        i->rauw(*op, *it->second[it->second.size() - 2].second);
       }
     } else {
       i->rauw(*op, *it->second.back().second);
@@ -497,17 +497,17 @@ rauw_op(const unordered_map<const Value*,
     return;
   }
 
-  if (auto *agg = dynamic_cast<AggregateValue*>(op)) {
+  if (auto *agg = dynamic_cast<AggregateValue *>(op)) {
     for (auto &v : agg->getVals()) {
       rauw_op(vmap, phis_from_orig_bb, op, v);
     }
   }
 }
 
-static BasicBlock&
-cloneBB(Function &F, const BasicBlock &BB, const char *suffix,
-        const unordered_map<const BasicBlock*, vector<BasicBlock*>> &bbmap,
-        unordered_map<const Value*, vector<pair<BasicBlock*, Value*>>> &vmap) {
+static BasicBlock &cloneBB(
+    Function &F, const BasicBlock &BB, const char *suffix,
+    const unordered_map<const BasicBlock *, vector<BasicBlock *>> &bbmap,
+    unordered_map<const Value *, vector<pair<BasicBlock *, Value *>>> &vmap) {
   string bb_name = BB.getName() + suffix;
   auto &newbb = F.getBB(bb_name);
   unordered_set<const Value *> phis_from_orig_bb;
@@ -549,7 +549,7 @@ cloneBB(Function &F, const BasicBlock &BB, const char *suffix,
     if (phi->getValues().empty()) {
       for (auto &[val, copies] : vmap) {
         if (copies.back().second == phi) {
-          newbb.rauw(*phi, *const_cast<Value*>(val));
+          newbb.rauw(*phi, *const_cast<Value *>(val));
           copies.pop_back();
           if (copies.empty())
             vmap.erase(val);
@@ -564,11 +564,12 @@ cloneBB(Function &F, const BasicBlock &BB, const char *suffix,
 }
 
 static auto getPhiPredecessors(const Function &F) {
-  unordered_map<string, vector<pair<Phi*, Value*>>> map;
+  unordered_map<string, vector<pair<Phi *, Value *>>> map;
   for (auto &i : F.instrs()) {
-    if (auto phi = dynamic_cast<const Phi*>(&i)) {
+    if (auto phi = dynamic_cast<const Phi *>(&i)) {
       for (auto &[val, pred] : phi->getValues()) {
-        map[pred].emplace_back(const_cast<Phi*>(phi), const_cast<Value*>(val));
+        map[pred].emplace_back(const_cast<Phi *>(phi),
+                               const_cast<Value *>(val));
       }
     }
   }
@@ -587,38 +588,84 @@ void Function::unroll(vector<unsigned> unroll_bounds) {
   auto &forest = la.getLoopForest();
   auto &sink = getSinkBB();
 
-  vector<tuple<BasicBlock*, unsigned, bool>> worklist;
+  vector<tuple<BasicBlock *, unsigned, bool>> worklist;
   // insert in reverse order because the worklist is iterated in LIFO
   for (auto I = roots.rbegin(), E = roots.rend(); I != E; ++I) {
     worklist.emplace_back(*I, 0, false);
   }
 
   // computed bottom-up during the post-order traversal below
-  unordered_map<BasicBlock*, vector<BasicBlock*>> loop_nodes;
+  unordered_map<BasicBlock *, vector<BasicBlock *>> loop_nodes;
 
   // grab all value users before duplication so the list is shorter
   auto users = getUsers();
   auto phi_preds = getPhiPredecessors(*this);
 
+  vector<BasicBlock *> loop_headers_in_order;
+
+  for (auto *bb : BB_order) { // BB_order maintains the code order
+    auto it = forest.find(bb);
+    if (it != forest.end() && !it->second.empty()) {
+      // bb is a loop header
+      loop_headers_in_order.emplace_back(bb);
+    }
+  }
+
+  // check size of loop_headers_in_order matches size of unroll_bounds
+  if (loop_headers_in_order.size() != unroll_bounds.size()) {
+
+    // check if unroll_bounds has only one element, if so, use that for all loop
+    // headers
+    if (unroll_bounds.size() == 1) {
+      unsigned bound = unroll_bounds.front();
+      unroll_bounds.clear();
+      unroll_bounds.resize(loop_headers_in_order.size(), bound);
+    } else {
+      cout
+          << "Number of loop headers does not match number of unroll bounds \n";
+      printf("Number of loop headers: %zu\n", loop_headers_in_order.size());
+      printf("Number of unroll bounds: %zu\n", unroll_bounds.size());
+      exit(1);
+    }
+  }
+
+  // map loop header -> unroll bound
+  unordered_map<BasicBlock *, unsigned> unroll_bound_map;
+  for (size_t i = 0; i < loop_headers_in_order.size(); ++i) {
+    auto *header = loop_headers_in_order[i];
+    unsigned bound = unroll_bounds.front();
+    unroll_bounds.erase(unroll_bounds.begin());
+    unroll_bound_map[header] = bound;
+  }
+
+  // print unroll_bound_map
+  //  cout << "Unroll bounds for loop headers: \n";
+  //  for (auto &[header, bound] : unroll_bound_map) {
+  //    cout << "Loop header: " << header->getName() << ", Unroll bound: " <<
+  //    bound << "\n";
+  //  }
+
   // traverse each loop tree in post-order
   while (!worklist.empty()) {
     auto [header, height, flag] = worklist.back();
+
     if (!flag) {
+
       get<2>(worklist.back()) = flag = true;
       auto I = forest.find(header);
       if (I != forest.end()) {
         // process all non-leaf children first
         for (auto *child : I->second) {
           if (forest.count(child))
-            worklist.emplace_back(child, height+1, false);
+            worklist.emplace_back(child, height + 1, false);
         }
         continue;
       }
     }
     worklist.pop_back();
 
-    vector<BasicBlock*> loop_bbs = { header };
-    vector<BasicBlock*> own_loop_bbs = loop_bbs;
+    vector<BasicBlock *> loop_bbs = {header};
+    vector<BasicBlock *> own_loop_bbs = loop_bbs;
     auto I = forest.find(header);
     if (I != forest.end()) {
       for (auto *bb : top_sort(I->second)) {
@@ -633,18 +680,18 @@ void Function::unroll(vector<unsigned> unroll_bounds) {
     }
 
     // map: original BB -> {BB} U copies-of-BB
-    unordered_map<const BasicBlock*, vector<BasicBlock*>> bbmap;
+    unordered_map<const BasicBlock *, vector<BasicBlock *>> bbmap;
     for (auto *bb : loop_bbs) {
       bbmap[bb].emplace_back(bb);
     }
 
     // loop exit BB -> landing outside-loop BB
-    set<pair<BasicBlock*, BasicBlock*>> exit_edges;
+    set<pair<BasicBlock *, BasicBlock *>> exit_edges;
     for (auto *bb : loop_bbs) {
       for (auto &dst : bb->targets()) {
         if (!bbmap.count(&dst)) {
-          exit_edges.emplace(bb, const_cast<BasicBlock*>(&dst));
-          header->addExitBlock(const_cast<BasicBlock*>(&dst));
+          exit_edges.emplace(bb, const_cast<BasicBlock *>(&dst));
+          header->addExitBlock(const_cast<BasicBlock *>(&dst));
         }
       }
     }
@@ -653,23 +700,19 @@ void Function::unroll(vector<unsigned> unroll_bounds) {
     // Note that the BBs list must be iterated in top-sort order so that
     // values from previous BBs are available in vmap
     auto &unrolled_bbs = loop_nodes.emplace(header, loop_bbs).first->second;
-    unordered_map<const Value*, vector<pair<BasicBlock*, Value*>>> vmap;
+    unordered_map<const Value *, vector<pair<BasicBlock *, Value *>>> vmap;
     string name_prefix;
     for (unsigned i = 0; i < height; ++i) {
       name_prefix += "#1";
     }
-    for (unsigned unroll = 2; unroll <= unroll_bounds.front(); ++unroll) {
+
+    for (unsigned unroll = 2; unroll <= unroll_bound_map[header]; ++unroll) {
       string suffix = name_prefix + '#' + to_string(unroll);
       for (auto *bb : loop_bbs) {
         auto &copies = bbmap.at(bb);
         copies.emplace_back(&cloneBB(*this, *bb, suffix.c_str(), bbmap, vmap));
         unrolled_bbs.emplace_back(copies.back());
       }
-    }
-    // use local unroll bounds
-    if (unroll_bounds.size()>1)
-    {
-      unroll_bounds.erase(unroll_bounds.begin());
     }
 
     // Clone the header once more so that the last iteration of the loop can
@@ -697,7 +740,7 @@ void Function::unroll(vector<unsigned> unroll_bounds) {
 
           // handle backedge
           if (&tgt == header) {
-            to = unroll+1 < dst_unroll ? dst_vect[unroll + 1] : &sink;
+            to = unroll + 1 < dst_unroll ? dst_vect[unroll + 1] : &sink;
           }
           // handle targets inside loop
           else {
@@ -709,7 +752,7 @@ void Function::unroll(vector<unsigned> unroll_bounds) {
     }
 
     // cache of introduced phis
-    map<pair<const BasicBlock*, const Value*>, Phi*> new_phis;
+    map<pair<const BasicBlock *, const Value *>, Phi *> new_phis;
     unsigned phi_counter = 0;
 
     topSort();
@@ -739,23 +782,21 @@ void Function::unroll(vector<unsigned> unroll_bounds) {
           continue;
 
         // insert a new phi on each dominator exit
-        set<pair<BasicBlock*, Phi*>> added_phis;
+        set<pair<BasicBlock *, Phi *>> added_phis;
         Phi *first_added_phi = nullptr;
 
         for (auto &[exit, dst] : exit_edges) {
           if (!dom_tree.dominates(bb_val, exit))
             continue;
 
-          if (auto phi = dynamic_cast<Phi*>(user);
-              phi && user_bb == dst) {
+          if (auto phi = dynamic_cast<Phi *>(user); phi && user_bb == dst) {
             // Check if the phi uses this value through this predecessor
             auto &vals = phi->getValues();
             auto *used_val = val;
             auto *ex = exit;
-            if (!any_of(vals.begin(), vals.end(),
-                        [&](const auto &p) {
-                          return p.first == used_val && &getBB(p.second) == ex;
-                        }))
+            if (!any_of(vals.begin(), vals.end(), [&](const auto &p) {
+                  return p.first == used_val && &getBB(p.second) == ex;
+                }))
               continue;
 
             auto &exit_copies = bbmap.at(exit);
@@ -781,8 +822,9 @@ void Function::unroll(vector<unsigned> unroll_bounds) {
           // original incoming BB
           auto all_preds = newphi->sources();
           if (find(all_preds.begin(), all_preds.end(), exit->getName()) ==
-                all_preds.end()) {
-            newphi->addValue(*const_cast<Value*>(val), string(exit->getName()));
+              all_preds.end()) {
+            newphi->addValue(*const_cast<Value *>(val),
+                             string(exit->getName()));
             auto &bb_dups = bbmap.at(exit);
             auto bb_I = bb_dups.begin(), bb_E = bb_dups.end();
             for (auto &[_, val] : copies) {
@@ -792,13 +834,13 @@ void Function::unroll(vector<unsigned> unroll_bounds) {
             }
           }
 
-          if (auto phi = dynamic_cast<Phi*>(user)) {
+          if (auto phi = dynamic_cast<Phi *>(user)) {
             for (auto &[pv, pred] : phi->getValues()) {
-              if (pv == val && dom_tree.dominates(dst, &getBB(pred))){
+              if (pv == val && dom_tree.dominates(dst, &getBB(pred))) {
                 phi->replace(pred, *newphi);
               }
             }
-          } else if (dynamic_cast<Instr*>(user)) {
+          } else if (dynamic_cast<Instr *>(user)) {
             user->rauw(*val, *newphi);
             added_phis.emplace(dst, newphi);
             if (!first_added_phi)
@@ -812,20 +854,20 @@ void Function::unroll(vector<unsigned> unroll_bounds) {
           static PtrType ptr_type(0);
           static IntType i32(string("i32"), 32);
           auto &type = val->getType();
-          auto size_alloc
-            = make_unique<IntConst>(i32, Memory::getStoreByteSize(type));
+          auto size_alloc =
+              make_unique<IntConst>(i32, Memory::getStoreByteSize(type));
           auto *size = size_alloc.get();
           addConstant(std::move(size_alloc));
 
           unsigned align = 16;
           auto name = val->getName() + "#ptr#" + to_string(phi_counter++);
-          auto alloca = make_unique<Alloc>(ptr_type, string(name), *size,
-                                           nullptr, align);
+          auto alloca =
+              make_unique<Alloc>(ptr_type, string(name), *size, nullptr, align);
 
           auto store = [&](auto *bb, const auto *val) {
             bb->addInstrAt(make_unique<Store>(*alloca.get(),
-                                              *const_cast<Value*>(val), align),
-                           static_cast<const Instr*>(val), false);
+                                              *const_cast<Value *>(val), align),
+                           static_cast<const Instr *>(val), false);
           };
 
           store(bb_val, val);
@@ -833,9 +875,9 @@ void Function::unroll(vector<unsigned> unroll_bounds) {
             store(bb, val);
           }
 
-          auto load
-            = make_unique<Load>(type, name + "#load", *alloca.get(), align);
-          auto *i = static_cast<Instr*>(user);
+          auto load =
+              make_unique<Load>(type, name + "#load", *alloca.get(), align);
+          auto *i = static_cast<Instr *>(user);
           i->rauw(*first_added_phi, *load.get());
           user_bb->addInstrAt(std::move(load), i, true);
 
@@ -920,7 +962,7 @@ void Function::print(ostream &os, bool print_header) const {
     os << "}\n";
 }
 
-ostream& operator<<(ostream &os, const Function &f) {
+ostream &operator<<(ostream &os, const Function &f) {
   f.print(os);
   return os;
 }
@@ -930,21 +972,20 @@ void Function::writeDot(const char *filename_prefix) const {
   if (filename_prefix)
     fname += string(".") + filename_prefix;
 
-  CFG cfg(*const_cast<Function*>(this));
+  CFG cfg(*const_cast<Function *>(this));
   {
     ofstream file(fname + ".cfg.dot");
     cfg.printDot(file);
   }
   {
     ofstream file(fname + ".dom.dot");
-    DomTree(*const_cast<Function*>(this), cfg).printDot(file);
+    DomTree(*const_cast<Function *>(this), cfg).printDot(file);
   }
   {
     ofstream file(fname + ".looptree.dot");
-    LoopAnalysis(*const_cast<Function*>(this)).printDot(file);
+    LoopAnalysis(*const_cast<Function *>(this)).printDot(file);
   }
 }
-
 
 void CFG::edge_iterator::next() {
   // jump to next BB with a terminator that is a jump
@@ -953,7 +994,7 @@ void CFG::edge_iterator::next() {
       return;
 
     if (!(*bbi)->empty()) {
-      if (auto instr = dynamic_cast<JumpInstr*>(&(*bbi)->back())) {
+      if (auto instr = dynamic_cast<JumpInstr *>(&(*bbi)->back())) {
         ti = instr->targets().begin();
         te = instr->targets().end();
         return;
@@ -963,15 +1004,15 @@ void CFG::edge_iterator::next() {
   }
 }
 
-CFG::edge_iterator::edge_iterator(vector<BasicBlock*>::iterator &&it,
-                                  vector<BasicBlock*>::iterator &&end)
-  : bbi(std::move(it)), bbe(std::move(end)) {
+CFG::edge_iterator::edge_iterator(vector<BasicBlock *>::iterator &&it,
+                                  vector<BasicBlock *>::iterator &&end)
+    : bbi(std::move(it)), bbe(std::move(end)) {
   next();
 }
 
-tuple<const BasicBlock&, const BasicBlock&, const Instr&>
-  CFG::edge_iterator::operator*() const {
-  return { **bbi, *ti, (*bbi)->back() };
+tuple<const BasicBlock &, const BasicBlock &, const Instr &>
+CFG::edge_iterator::operator*() const {
+  return {**bbi, *ti, (*bbi)->back()};
 }
 
 void CFG::edge_iterator::operator++(void) {
@@ -993,7 +1034,8 @@ static string_view bb_dot_name(const string &name) {
 
 void CFG::printDot(ostream &os) const {
   os << "digraph {\n"
-        "\"" << bb_dot_name(f.getBBs()[0]->getName()) << "\" [shape=box];\n";
+        "\""
+     << bb_dot_name(f.getBBs()[0]->getName()) << "\" [shape=box];\n";
 
   for (auto [src, dst, instr] : *this) {
     os << '"' << bb_dot_name(src.getName()) << "\" -> \""
@@ -1001,7 +1043,6 @@ void CFG::printDot(ostream &os) const {
   }
   os << "}\n";
 }
-
 
 // Relies on Alive's top_sort run during llvm2alive conversion in order to
 // traverse the cfg in reverse postorder to build dominators.
@@ -1022,7 +1063,7 @@ void DomTree::buildDominators(const CFG &cfg) {
   auto &entry = doms.at(&f.getFirstBB());
   entry.dominator = &entry;
 
-  // Cooper, Keith D.; Harvey, Timothy J.; and Kennedy, Ken (2001). 
+  // Cooper, Keith D.; Harvey, Timothy J.; and Kennedy, Ken (2001).
   // A Simple, Fast Dominance Algorithm
   // http://www.cs.rice.edu/~keith/EMBED/dom.pdf
   // Makes multiple passes when CFG is cyclic to update incorrect initial
@@ -1050,7 +1091,7 @@ void DomTree::buildDominators(const CFG &cfg) {
   } while (changed);
 }
 
-DomTree::DomTreeNode* DomTree::intersect(DomTreeNode *f1, DomTreeNode *f2) {
+DomTree::DomTreeNode *DomTree::intersect(DomTreeNode *f1, DomTreeNode *f2) {
   while (f1->order != f2->order) {
     while (f1->order < f2->order)
       f1 = f1->dominator;
@@ -1061,7 +1102,7 @@ DomTree::DomTreeNode* DomTree::intersect(DomTreeNode *f1, DomTreeNode *f2) {
 }
 
 // get immediate dominator BasicBlock
-const BasicBlock* DomTree::getIDominator(const BasicBlock &bb) const {
+const BasicBlock *DomTree::getIDominator(const BasicBlock &bb) const {
   auto dom = doms.at(&bb).dominator;
   return dom ? &dom->bb : nullptr;
 }
@@ -1082,9 +1123,10 @@ bool DomTree::dominates(const BasicBlock *a, const BasicBlock *b) const {
 
 void DomTree::printDot(ostream &os) const {
   os << "digraph {\n"
-        "\"" << bb_dot_name(f.getFirstBB().getName()) << "\" [shape=box];\n";
+        "\""
+     << bb_dot_name(f.getFirstBB().getName()) << "\" [shape=box];\n";
 
-  for (auto I = f.getBBs().begin()+1, E = f.getBBs().end(); I != E; ++I) {
+  for (auto I = f.getBBs().begin() + 1, E = f.getBBs().end(); I != E; ++I) {
     if (auto dom = getIDominator(**I)) {
       os << '"' << bb_dot_name(dom->getName()) << "\" -> \""
          << bb_dot_name((*I)->getName()) << "\";\n";
@@ -1094,7 +1136,6 @@ void DomTree::printDot(ostream &os) const {
   os << "}\n";
 }
 
-
 void LoopAnalysis::getDepthFirstSpanningTree() {
   // +1 to account for the sink BB
   unsigned bb_count = f.getBBs().size() + 1;
@@ -1102,9 +1143,9 @@ void LoopAnalysis::getDepthFirstSpanningTree() {
   last.resize(bb_count, -1u);
 
   unsigned current = 0;
-  vector<pair<BasicBlock*, bool>> worklist = { {&f.getFirstBB(), false} };
+  vector<pair<BasicBlock *, bool>> worklist = {{&f.getFirstBB(), false}};
   unordered_set<const BasicBlock *> visited;
-  while(!worklist.empty()) {
+  while (!worklist.empty()) {
     auto &[bb, flag] = worklist.back();
     if (flag) {
       last[number[bb]] = current - 1;
@@ -1116,7 +1157,7 @@ void LoopAnalysis::getDepthFirstSpanningTree() {
 
       for (auto &tgt : bb->targets())
         if (visited.insert(&tgt).second)
-          worklist.emplace_back(const_cast<BasicBlock*>(&tgt), false);
+          worklist.emplace_back(const_cast<BasicBlock *>(&tgt), false);
     }
   }
 }
@@ -1191,15 +1232,14 @@ void LoopAnalysis::run() {
     if (h == 0 && type[i] != nonheader) {
       roots.emplace_back(node[i]);
       (void)forest[node[i]];
-    }
-    else if (h != 0 || type[i] != nonheader) {
+    } else if (h != 0 || type[i] != nonheader) {
       parent.emplace(node[i], node[h]);
       forest[node[h]].emplace_back(node[i]);
     }
   }
 }
 
-BasicBlock* LoopAnalysis::getParent(BasicBlock *bb) const {
+BasicBlock *LoopAnalysis::getParent(BasicBlock *bb) const {
   auto I = parent.find(bb);
   return I != parent.end() ? I->second : nullptr;
 }
@@ -1207,7 +1247,7 @@ BasicBlock* LoopAnalysis::getParent(BasicBlock *bb) const {
 void LoopAnalysis::printDot(ostream &os) const {
   os << "digraph {\n";
 
-  unordered_set<const BasicBlock*> seen_roots;
+  unordered_set<const BasicBlock *> seen_roots;
   auto decl_root = [&](const BasicBlock *root) {
     auto name = bb_dot_name(root->getName());
     if (seen_roots.insert(root).second)
@@ -1218,12 +1258,11 @@ void LoopAnalysis::printDot(ostream &os) const {
   for (auto &[root, nodes] : forest) {
     auto root_name = decl_root(root);
     for (auto *node : nodes) {
-      os << '"' << root_name << "\" -> \""
-         << bb_dot_name(node->getName()) << "\";\n";
+      os << '"' << root_name << "\" -> \"" << bb_dot_name(node->getName())
+         << "\";\n";
     }
   }
   os << "}\n";
 }
 
-} 
-
+} // namespace IR
