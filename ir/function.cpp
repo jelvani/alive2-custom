@@ -605,7 +605,7 @@ void Function::unroll(vector<unsigned> unroll_bounds) {
 
   for (auto *bb : BB_order) { // BB_order maintains the code order
     auto it = forest.find(bb);
-    if (it != forest.end() && !it->second.empty()) {
+    if (it != forest.end()) {
       // bb is a loop header
       loop_headers_in_order.emplace_back(bb);
     }
@@ -633,9 +633,7 @@ void Function::unroll(vector<unsigned> unroll_bounds) {
   unordered_map<BasicBlock *, unsigned> unroll_bound_map;
   for (size_t i = 0; i < loop_headers_in_order.size(); ++i) {
     auto *header = loop_headers_in_order[i];
-    unsigned bound = unroll_bounds.front();
-    unroll_bounds.erase(unroll_bounds.begin());
-    unroll_bound_map[header] = bound;
+    unroll_bound_map[header] = unroll_bounds[i];
   }
 
   // print unroll_bound_map
