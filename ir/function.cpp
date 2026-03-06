@@ -1227,10 +1227,14 @@ void LoopAnalysis::run() {
   // Construct the loop forest (0 or more loop trees)
   for (unsigned i = 0; i < bb_count; ++i) {
     auto h = header[i];
-    if (h == 0 && type[i] != nonheader) {
-      roots.emplace_back(node[i]);
+    // Force ALL loop headers to exist as keys in the forest map
+    if (type[i] != NodeType::nonheader) {
       (void)forest[node[i]];
-    } else if (h != 0 || type[i] != nonheader) {
+    }
+    // Build roots and parent-child edges
+    if (h == 0 && type[i] != NodeType::nonheader) {
+      roots.emplace_back(node[i]);
+    } else if (h != 0) {
       parent.emplace(node[i], node[h]);
       forest[node[h]].emplace_back(node[i]);
     }
