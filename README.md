@@ -1,5 +1,8 @@
-Alive2
+Alive2-custom
 ======
+Modified Alive2 from [Exploring Locally Bounded Translation Validation](https://dl.acm.org/doi/proceedings/10.1145/3814987)
+
+Usage: If `src` and `tgt` have two loops each then individual loop unroll bounds can be used as follows: `alive-tv test.ll --src-unroll=1,2 --tgt-unroll=1,2`
 
 ![Alive2 logo](imgs/alive2.png)
 
